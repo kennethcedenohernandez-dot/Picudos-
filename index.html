@@ -93,7 +93,7 @@
     <h2>Datos del día</h2>
     <div class="grid2">
       <div><label for="fecha">Fecha</label><input type="date" id="fecha"></div>
-      <div><label for="nombre">Nombre</label><input id="nombre" list="lstNom" autocomplete="off" placeholder="Quien revisa"></div>
+      <div><label for="nombre">Nombre</label><select id="nombre"></select></div>
     </div>
     <datalist id="lstNom"></datalist>
     <div class="hint">Fecha y nombre se mantienen para todas las trampas que revise.</div>
@@ -160,7 +160,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones</b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 2</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -210,14 +210,17 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
     if(!LOTES.includes(lote))lote=LOTES[0];
   }
 
+  const PERSONAL=["Andrey Muñoz Cortes", "Derin Corea Mora", "Donovan Ugarte Tenorio", "Kendall Jimenez Navarro", "Lidianeth Navarro Lopez", "Oscar Cedeño Caballero", "Ralfi Alberto Obando Porras", "Victor Campos Chavez"];
+  $('nombre').innerHTML='<option value="">— Elegir —</option>'+PERSONAL.map(n=>'<option>'+esc(n)+'</option>').join('');
+
   // ---------- almacenamiento ----------
   function load(){
     try{regs=JSON.parse(localStorage.getItem(KEY)||'[]');}catch(e){regs=[];}
     try{const b=JSON.parse(localStorage.getItem(KEYB)||'null');if(b&&Array.isArray(b.t)&&b.t.length&&(b.gen||'')>=(base.gen||''))base=b;}catch(e){}
-    try{const h=JSON.parse(localStorage.getItem(KEYH)||'{}');if(h.nombre)$('nombre').value=h.nombre;if(h.lote)lote=h.lote;}catch(e){}
+    try{const h=JSON.parse(localStorage.getItem(KEYH)||'{}');if(PERSONAL.includes(h.nombre))$('nombre').value=h.nombre;if(h.lote)lote=h.lote;}catch(e){}
   }
   function save(){try{localStorage.setItem(KEY,JSON.stringify(regs));return true;}catch(e){alert('No se pudo guardar en el teléfono: '+e.message);return false;}}
-  function saveHdr(){try{localStorage.setItem(KEYH,JSON.stringify({nombre:nombre($('nombre').value),lote}));}catch(e){}}
+  function saveHdr(){try{localStorage.setItem(KEYH,JSON.stringify({nombre:$('nombre').value,lote}));}catch(e){}}
 
   const regOf=(num,f)=>regs.find(r=>r.num===num&&r.fecha===f);
   const lastOf=(num,antes)=>regs.filter(r=>r.num===num&&r.fecha<antes).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
@@ -265,8 +268,8 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   // ---------- hoja de captura ----------
   function paintEstado(){$('segEstado').innerHTML=ESTADOS.map(e=>'<button type="button" data-e="'+e+'" class="'+(e===estado?'on':'')+'">'+e+'</button>').join('');}
   function openTrap(num,fecha){
-    const nom=nombre($('nombre').value);
-    if(!nom){toast('Primero escriba su nombre.');$('nombre').focus();return;}
+    const nom=$('nombre').value;
+    if(!nom){toast('Primero elija su nombre.');$('nombre').focus();return;}
     const t=BYNUM[num];if(!t)return;
     const f=fecha||$('fecha').value;
     if(!f){toast('Elija la fecha.');return;}
@@ -284,7 +287,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   function closeTrap(){$('ov').hidden=true;document.body.style.overflow='';cur=null;editId=null;}
   function guardar(){
     if(!cur)return false;
-    const f=cur.fecha,nom=nombre($('nombre').value);
+    const f=cur.fecha,nom=$('nombre').value;
     const rec={id:editId||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),fecha:f,nombre:nom,num:cur.num,
       pic:int($('pic').value),mar:int($('mar').value),estado,obs:$('obs').value.trim(),creado:new Date().toISOString()};
     const prev=editId?regs.find(r=>r.id===editId):regOf(cur.num,f);
@@ -314,7 +317,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   $('trampas').addEventListener('click',e=>{const b=e.target.closest('[data-n]');if(b)openTrap(Number(b.dataset.n));});
   $('buscar').addEventListener('input',render);
   $('fecha').addEventListener('change',()=>{$('filtroFecha').value=$('fecha').value;render();});
-  $('nombre').addEventListener('change',()=>{$('nombre').value=nombre($('nombre').value);saveHdr();});
+  $('nombre').addEventListener('change',saveHdr);
   $('filtroFecha').addEventListener('change',render);
   $('lista').addEventListener('click',e=>{
     const ed=e.target.closest('[data-ed]'),dl=e.target.closest('[data-del]');
