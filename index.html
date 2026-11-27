@@ -187,7 +187,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 5</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 6</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -464,14 +464,14 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
     const pts=puntosMapa(),box=$('mapaBox');
     if(LF){
       if(!lmap){box.innerHTML='';lmap=LF.map(box,{zoomControl:true,attributionControl:true});
-        LF.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Imágenes © Esri'}).addTo(lmap);
+        LF.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:17,attribution:'Imágenes © Esri'}).addTo(lmap);
         lmap.on('zoomend',()=>pintarMapa(false));}
       setTimeout(()=>lmap.invalidateSize(),50);
       if(lcapa)lcapa.remove();lcapa=LF.layerGroup().addTo(lmap);
       const etiquetas=lmap.getZoom()>=17||pts.length<=40;
       pts.forEach(x=>{const m=LF.circleMarker([x.c.lat,x.c.lng],{radius:8,color:'#fff',weight:2,fillColor:x.col,fillOpacity:1}).bindPopup(popTxt(x)).addTo(lcapa);
         if(etiquetas)m.bindTooltip(String(x.t[0]),{permanent:true,direction:'right',offset:[8,0],className:'lbl-tr'});});
-      if(encuadrar&&pts.length)lmap.fitBounds(LF.latLngBounds(pts.map(x=>[x.c.lat,x.c.lng])).pad(0.15),{maxZoom:18});
+      if(encuadrar&&pts.length)lmap.fitBounds(LF.latLngBounds(pts.map(x=>[x.c.lat,x.c.lng])).pad(0.15),{maxZoom:17});
       $('mapaInfo').textContent=pts.length+' trampas en el mapa';
       pintarYo();
     }else{
