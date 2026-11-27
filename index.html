@@ -187,7 +187,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 8</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 9</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -205,7 +205,8 @@
     <h2>Base de trampas</h2>
     <div class="ro" id="baseInfo"></div>
     <button class="btn btn-p" id="btnBaseGps" type="button">Descargar base con coordenadas (.xlsx)</button>
-    <button class="btn btn-s" id="btnKml" type="button">Descargar mapa para Google Earth / Maps (.kml)</button>
+    <button class="btn btn-s" id="btnKml" type="button">Descargar mapa para Google Earth (.kml)</button>
+    <button class="btn btn-s" id="btnCsvMapa" type="button">Descargar puntos para Google My Maps (.csv)</button>
     <div class="hint">Sale con las columnas de la hoja BASE y la columna Cordenadas llena. Junte los archivos de todos los teléfonos y mándelos para meter las coordenadas en la app de todos.</div>
     <button class="btn btn-s" id="btnBase" type="button">Cargar base de trampas actualizada</button>
     <input type="file" id="fileBase" accept=".xlsx" style="display:none">
@@ -531,14 +532,24 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   window.addEventListener('resize',()=>{if(!$('mapa').hidden&&!LF)pintarMapa(false);});
   function buildKml(){
     const xe2=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    const por={};T.forEach(t=>{const c=coordsOf(t[0]);if(c)(por[t[1]]=por[t[1]]||[]).push([t,c]);});
-    let k='<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Trampas de picudo</name>'+
-      '<Style id="t"><IconStyle><color>ff29b4f0</color><scale>0.9</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>';
-    Object.keys(por).sort((a,b)=>a-b).forEach(l=>{k+='<Folder><name>Lote '+xe2(l)+'</name>';
-      por[l].forEach(([t,c])=>{k+='<Placemark><name>'+t[0]+'</name><styleUrl>#t</styleUrl><description>'+xe2('Trampa '+t[0]+' · Lote '+t[1]+' · Centro '+t[2]+' · H'+(t[3]||'–')+' · P'+(t[4]||'–')+' · '+t[5]+(c.acc!=null?' · ±'+c.acc+' m':''))+'</description><Point><coordinates>'+c.lng+','+c.lat+',0</coordinates></Point></Placemark>';});
-      k+='</Folder>';});
-    return new Blob([k+'</Document></kml>'],{type:'application/vnd.google-earth.kml+xml'});
+    const por={},todos=[];T.forEach(t=>{const c=coordsOf(t[0]);if(c){(por[t[1]]=por[t[1]]||[]).push([t,c]);todos.push(c);}});
+    const la=todos.reduce((s,c)=>s+c.lat,0)/todos.length,lo=todos.reduce((s,c)=>s+c.lng,0)/todos.length;
+    let ext=0;todos.forEach(c=>{ext=Math.max(ext,distM(la,lo,c.lat,c.lng));});
+    let k='<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>Trampas de picudo</name>\n<open>1</open>\n'+
+      '<LookAt><longitude>'+lo.toFixed(7)+'</longitude><latitude>'+la.toFixed(7)+'</latitude><altitude>0</altitude><heading>0</heading><tilt>0</tilt><range>'+Math.max(400,Math.round(ext*3))+'</range><altitudeMode>relativeToGround</altitudeMode></LookAt>\n'+
+      '<Style id="t"><IconStyle><scale>1.1</scale><Icon><href>https://maps.google.com/mapfiles/kml/paddle/ylw-circle.png</href></Icon><hotSpot x="0.5" y="0" xunits="fraction" yunits="fraction"/></IconStyle><LabelStyle><scale>1.1</scale></LabelStyle></Style>\n';
+    Object.keys(por).sort((a,b)=>a-b).forEach(l=>{k+='<Folder><name>Lote '+xe2(l)+'</name><open>1</open>\n';
+      por[l].forEach(([t,c])=>{k+='<Placemark><name>'+t[0]+'</name><styleUrl>#t</styleUrl><description>'+xe2('Trampa '+t[0]+' · Lote '+t[1]+' · Centro '+t[2]+' · H'+(t[3]||'–')+' · P'+(t[4]||'–')+' · '+t[5]+(c.acc!=null?' · ±'+c.acc+' m':''))+'</description><Point><coordinates>'+c.lng.toFixed(7)+','+c.lat.toFixed(7)+',0</coordinates></Point></Placemark>\n';});
+      k+='</Folder>\n';});
+    return new Blob([k+'</Document>\n</kml>\n'],{type:'application/vnd.google-earth.kml+xml'});
   }
+  function buildCsvMapa(){
+    const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+    let s='Latitud,Longitud,Trampa,Lote,Centro,Hilera,Palma,Codigo,Precision_m\r\n';
+    T.forEach(t=>{const c=coordsOf(t[0]);if(c)s+=[c.lat.toFixed(7),c.lng.toFixed(7),t[0],t[1],q(t[2]),q(t[3]),q(t[4]),q(t[5]),c.acc!=null?c.acc:''].join(',')+'\r\n';});
+    return new Blob(['\ufeff'+s],{type:'text/csv'});
+  }
+  $('btnCsvMapa').addEventListener('click',()=>{if(!T.some(t=>coordsOf(t[0]))){alert('Ninguna trampa tiene coordenadas todavía.');return;}descargar(buildCsvMapa(),'Trampas_picudo_mapa_'+hoy()+'.csv');});
   $('btnKml').addEventListener('click',()=>{if(!T.some(t=>coordsOf(t[0]))){alert('Ninguna trampa tiene coordenadas todavía.');return;}descargar(buildKml(),'Trampas_picudo_'+hoy()+'.kml');});
 
   // ---------- trampas cercanas ----------
@@ -743,7 +754,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   $('fecha').value=hoy();
   render();
   if(window.claude&&typeof window.claude.use==='function'){window.claude.use('downloads').then(x=>{downloads=x||null;},()=>{downloads=null;});}
-  window.__app={get regs(){return regs;},buildXlsx,leerBase,buildBaseGps,buildKml,GPS:()=>GPS,saveGps};
+  window.__app={get regs(){return regs;},buildXlsx,leerBase,buildBaseGps,buildKml,buildCsvMapa,GPS:()=>GPS,saveGps};
 })();
 </script>
 <script>
