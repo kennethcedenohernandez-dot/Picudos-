@@ -57,6 +57,7 @@
   .filtro{display:flex;gap:8px;align-items:center;margin-bottom:6px}
   .ro{padding:10px;border-radius:8px;background:#f3efe9;font-size:15px}
   .warn{background:var(--amar);color:var(--amarT);border-radius:8px;padding:8px 10px;font-size:14px;margin-top:8px}
+  .warn.red{background:#fbe9e7;color:var(--rojo);font-weight:600}
   .msg{padding:10px 12px;border-radius:8px;margin-top:10px;font-size:15px;display:none}
   .msg.ok{display:block;background:#e3f4e7;color:#185c2c}
   .msg.err{display:block;background:#fbe9e7;color:var(--rojo)}
@@ -187,7 +188,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 9</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 10</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -353,37 +354,43 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   function renderGpsBox(){
     if(!cur)return;const c=coordsOf(cur.num),b=$('gpsBox');
     if(c){
-      b.innerHTML='<div class="ro"><b>Ubicación:</b> '+llTxt(c)+(c.acc!=null?' · ±'+Math.round(c.acc)+' m':'')+'</div><div class="hint">'+(c.src==='tel'?'Tomada en este teléfono'+(c.fecha?' el '+fmtF(c.fecha):'')+(c.por?' por '+esc(c.por):''):'De la base de trampas')+'</div>'+
+      b.innerHTML='<div class="ro"><b>Ubicación:</b> '+llTxt(c)+(c.acc!=null?' · ±'+Math.round(c.acc)+' m':'')+'</div>'+(c.acc!=null&&c.acc>GPS_MAX?'<div class="warn red">Precisión mala (±'+Math.round(c.acc)+' m): este punto puede estar lejos de la trampa. Vuelva a tomar el GPS junto a ella.</div>':'')+'<div class="hint">'+(c.src==='tel'?'Tomada en este teléfono'+(c.fecha?' el '+fmtF(c.fecha):'')+(c.por?' por '+esc(c.por):''):'De la base de trampas')+'</div>'+
         '<div class="row-btns"><button class="btn btn-p" type="button" id="gpsIr">Ir a la trampa</button><button class="btn btn-s" type="button" id="gpsTomar">Volver a tomar GPS</button></div>';
     }else{
-      b.innerHTML='<div class="ro">Esta trampa no tiene coordenadas.</div><div class="hint">Párese junto a la trampa y toque el botón. Tarda unos segundos en afinar la señal.</div><button class="btn btn-p" type="button" id="gpsTomar">Tomar GPS aquí</button>';
+      b.innerHTML='<div class="ro">Esta trampa no tiene coordenadas.</div><div class="hint">Párese junto a la trampa con el teléfono quieto y toque el botón. Solo guarda cuando la precisión es ±15 m o mejor; puede tardar hasta 2 minutos.</div><button class="btn btn-p" type="button" id="gpsTomar">Tomar GPS aquí</button>';
     }
     const ir=$('gpsIr');if(ir)ir.onclick=()=>abrirNav(cur.num);
     $('gpsTomar').onclick=tomarGps;
   }
   let tomando=null;
+  const GPS_MAX=15, GPS_ESPERA=180000;
   function tomarGps(){
     if(!navigator.geolocation){alert('Este navegador no tiene GPS.');return;}
     if(tomando!=null)return;
-    const num=cur.num,b=$('gpsTomar');let mejor=null,fin;
-    b.disabled=true;b.textContent='Buscando señal…';
-    const terminar=()=>{
-      if(tomando==null)return;navigator.geolocation.clearWatch(tomando);tomando=null;clearTimeout(fin);
-      if(!mejor){alert('No se pudo obtener la señal GPS. Revise que la ubicación del teléfono esté activada y que Chrome tenga permiso.');if(cur&&cur.num===num)renderGpsBox();return;}
-      const c=mejor.coords,ant=coordsOf(num);
-      if(ant&&!confirm('La trampa '+num+' ya tiene coordenadas. ¿Reemplazarlas por las nuevas (±'+Math.round(c.accuracy)+' m)?')){if(cur&&cur.num===num)renderGpsBox();return;}
+    const num=cur.num,b=$('gpsTomar'),t0=Date.now();let mejor=null,buena=null,fin,cierre=null;
+    b.textContent='Buscando señal GPS… (toque para cancelar)';
+    const parar=()=>{if(tomando!=null)navigator.geolocation.clearWatch(tomando);tomando=null;clearTimeout(fin);clearTimeout(cierre);};
+    b.onclick=()=>{parar();toast('Toma de GPS cancelada');if(cur&&cur.num===num)renderGpsBox();};
+    const guardar=()=>{
+      parar();
+      if(!buena){alert('Señal GPS insuficiente: la mejor precisión fue '+(mejor?'±'+Math.round(mejor.coords.accuracy)+' m':'ninguna')+'. NO se guardó.\n\nSalga a un claro o a la calle más cercana, espere 1 a 2 minutos con el teléfono quieto y vuelva a intentar.');if(cur&&cur.num===num)renderGpsBox();return;}
+      const c=buena.coords,ant=coordsOf(num);
+      if(ant&&!confirm('La trampa '+num+' ya tiene coordenadas'+(ant.acc!=null?' (±'+ant.acc+' m)':'')+'. ¿Reemplazarlas por las nuevas (±'+Math.round(c.accuracy)+' m)?')){if(cur&&cur.num===num)renderGpsBox();return;}
       GPS[num]=[+c.latitude.toFixed(7),+c.longitude.toFixed(7),Math.round(c.accuracy),hoy(),$('nombre').value||''];
       saveGps();toast('Ubicación guardada · ±'+Math.round(c.accuracy)+' m');
       if(cur&&cur.num===num)renderGpsBox();render();
     };
     tomando=navigator.geolocation.watchPosition(p=>{
-      if(!mejor||p.coords.accuracy<mejor.coords.accuracy)mejor=p;
-      if(b.isConnected)b.textContent='Afinando señal… ±'+Math.round(mejor.coords.accuracy)+' m (toque para guardar)';
-      b.disabled=false;b.onclick=terminar;
-      if(mejor.coords.accuracy<=5)terminar();
-    },err=>{if(!mejor){navigator.geolocation.clearWatch(tomando);tomando=null;clearTimeout(fin);alert(err.code===1?'Chrome no tiene permiso de ubicación. Actívelo en la configuración del sitio.':'No se pudo obtener la señal GPS ('+err.message+').');if(cur&&cur.num===num)renderGpsBox();}},
-    {enableHighAccuracy:true,maximumAge:0,timeout:30000});
-    fin=setTimeout(terminar,25000);
+      const a=p.coords.accuracy;
+      if(!mejor||a<mejor.coords.accuracy)mejor=p;
+      if(a<=GPS_MAX&&(!buena||a<buena.coords.accuracy))buena=p;
+      const seg=Math.round((Date.now()-t0)/1000);
+      if(b.isConnected)b.textContent=buena?('Señal buena ±'+Math.round(buena.coords.accuracy)+' m · afinando…'):('Esperando GPS… ahora ±'+Math.round(a)+' m (necesita ±'+GPS_MAX+' o menos) · '+seg+' s · toque para cancelar');
+      if(buena&&!cierre)cierre=setTimeout(guardar,8000);
+      if(buena&&buena.coords.accuracy<=4)guardar();
+    },err=>{if(err.code===1){parar();alert('Chrome no tiene permiso de ubicación. Actívelo en la configuración del sitio.');if(cur&&cur.num===num)renderGpsBox();}},
+    {enableHighAccuracy:true,maximumAge:0,timeout:GPS_ESPERA});
+    fin=setTimeout(guardar,GPS_ESPERA);
   }
 
   // ---------- navegación hasta la trampa ----------
