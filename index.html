@@ -97,8 +97,8 @@
   #mapaBox svg{position:absolute;inset:0;width:100%;height:100%}
   .mapa-ley{display:flex;flex-wrap:wrap;gap:12px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:#fff;font-size:13px;color:var(--gris);align-items:center}
   .mapa-ley i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:4px;border:2px solid #fff;box-shadow:0 0 0 1px #0004}
-  .lbl-tr{background:transparent;border:0;box-shadow:none;color:#fff;font-weight:800;font-size:12px;text-shadow:0 0 3px #000,0 0 3px #000;padding:0}
-  .lbl-tr:before{display:none}
+  .leaflet-tooltip.lbl-tr{background:#fff;border:1.5px solid #5a3a14;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.4);color:#22190f;font:800 14px/1.1 system-ui,-apple-system,Roboto,sans-serif;padding:2px 6px;text-shadow:none;-webkit-font-smoothing:antialiased}
+  .leaflet-tooltip.lbl-tr:before{display:none}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:40;background:#22190f;color:#fff;padding:10px 16px;border-radius:10px;font-size:15px;font-weight:600;max-width:calc(100% - 32px);text-align:center}
   .toast[hidden]{display:none}
 </style>
@@ -187,7 +187,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 6</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 7</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -470,7 +470,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
       if(lcapa)lcapa.remove();lcapa=LF.layerGroup().addTo(lmap);
       const etiquetas=lmap.getZoom()>=17||pts.length<=40;
       pts.forEach(x=>{const m=LF.circleMarker([x.c.lat,x.c.lng],{radius:8,color:'#fff',weight:2,fillColor:x.col,fillOpacity:1}).bindPopup(popTxt(x)).addTo(lcapa);
-        if(etiquetas)m.bindTooltip(String(x.t[0]),{permanent:true,direction:'right',offset:[8,0],className:'lbl-tr'});});
+        if(etiquetas)m.bindTooltip(String(x.t[0]),{permanent:true,direction:'right',offset:[10,0],className:'lbl-tr'});});
       if(encuadrar&&pts.length)lmap.fitBounds(LF.latLngBounds(pts.map(x=>[x.c.lat,x.c.lng])).pad(0.15),{maxZoom:17});
       $('mapaInfo').textContent=pts.length+' trampas en el mapa';
       pintarYo();
