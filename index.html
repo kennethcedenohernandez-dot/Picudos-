@@ -75,6 +75,19 @@
   .admin[hidden]{display:none}
   .admin-in{max-width:640px;margin:0 auto;padding:12px;background:#f7f5f2;min-height:100%}
   .admin-top{display:flex;justify-content:space-between;align-items:center;padding:6px 2px 12px;font-size:18px;color:var(--cafe)}
+  .gps{border:1px solid var(--borde);border-radius:10px;padding:10px;margin-top:10px;background:#fbf8f3}
+  .gps .ro{margin-bottom:4px}
+  .nav{position:fixed;inset:0;z-index:35;background:#1d140a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));text-align:center}
+  .nav[hidden]{display:none}
+  .nav .nt{font-size:22px;font-weight:800;color:#ffd27a}
+  .nav .ns{font-size:14px;opacity:.8}
+  .nav .dist{font-size:72px;font-weight:800;line-height:1}
+  .nav .dir{font-size:18px;margin-top:6px}
+  .nav svg{width:min(70vw,300px);height:min(70vw,300px)}
+  .nav .estado{font-size:15px;min-height:40px;opacity:.9}
+  .nav .btn{max-width:420px}
+  .nav.llego{background:#16431f}
+  .cerca{margin-top:8px}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:40;background:#22190f;color:#fff;padding:10px 16px;border-radius:10px;font-size:15px;font-weight:600;max-width:calc(100% - 32px);text-align:center}
   .toast[hidden]{display:none}
 </style>
@@ -104,6 +117,8 @@
     <div class="seg" id="segLote"></div>
     <label for="buscar">Buscar # de trampa</label>
     <input id="buscar" inputmode="numeric" placeholder="Ej. 231" autocomplete="off">
+    <button class="btn btn-s" id="btnCerca" type="button">Trampas cercanas (GPS)</button>
+    <div id="cerca" class="cerca"></div>
   </section>
 
   <section class="card">
@@ -136,6 +151,7 @@
       <button type="button" class="x" id="shX">✕</button>
     </div>
     <div id="shPrev" class="hint"></div>
+    <div class="gps" id="gpsBox"></div>
 
     <label for="pic">Total de picudos</label>
     <div class="cnt"><button type="button" data-step="pic" data-d="-1">−</button><input id="pic" inputmode="numeric" value="0"><button type="button" data-step="pic" data-d="1">+</button></div>
@@ -160,7 +176,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 2</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 3</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -177,18 +193,38 @@
   <section class="card">
     <h2>Base de trampas</h2>
     <div class="ro" id="baseInfo"></div>
+    <button class="btn btn-p" id="btnBaseGps" type="button">Descargar base con coordenadas (.xlsx)</button>
+    <div class="hint">Sale con las columnas de la hoja BASE y la columna Cordenadas llena. Junte los archivos de todos los teléfonos y mándelos para meter las coordenadas en la app de todos.</div>
     <button class="btn btn-s" id="btnBase" type="button">Cargar base de trampas actualizada</button>
     <input type="file" id="fileBase" accept=".xlsx" style="display:none">
     <div class="hint">Lee la hoja "BASE" (columnas Codigo de la trampa, Lote, Centro, Hilera, Palma, # trampa). Úsela cuando agregue o mueva trampas.</div>
   </section>
  </div>
 </div>
+<div id="nav" class="nav" hidden>
+  <div><div class="nt" id="navT"></div><div class="ns" id="navS"></div></div>
+  <div>
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="4"/>
+      <g id="navRose"><text x="100" y="26" text-anchor="middle" fill="#ff8a7a" font-size="18" font-weight="700">N</text></g>
+      <g id="navArrow"><path d="M100 24 L132 120 L100 102 L68 120 Z" fill="#ffd27a"/></g>
+    </svg>
+    <div class="dist" id="navDist">—</div>
+    <div class="dir" id="navDir"></div>
+  </div>
+  <div style="width:100%;display:flex;flex-direction:column;align-items:center">
+    <div class="estado" id="navEst">Buscando señal GPS…</div>
+    <button class="btn btn-s" id="navBrujula" type="button" style="display:none">Activar brújula</button>
+    <button class="btn btn-p" id="navCerrar" type="button">Cerrar</button>
+  </div>
+</div>
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script>
 const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (corregida)","t":[[1,80,"2","8","39","FE8028391"],[2,80,"3","9","15","FE8039152"],[3,80,"4","7","32","FE8047323"],[4,80,"5","6","10","FE8056104"],[5,80,"6","7","41","FE8067415"],[6,80,"7","6","17","FE8076176"],[206,80,"9","6","44","FE809644206"],[7,80,"11","3","8","FE8011387"],[207,80,"14","7","29","FE8014729207"],[8,80,"15","4","7","FE8015478"],[9,80,"16","7","5","FE8016759"],[10,80,"16","7","38","FE801673810"],[11,80,"17","7","22","FE801772211"],[12,80,"18","7","33","FE801873312"],[13,80,"18","7","13","FE801871313"],[14,80,"19","23","53","FE8019235314"],[15,80,"19","23","6","FE801923615"],[16,80,"20","8","19","FE802081916"],[17,80,"21","7","38","FE802173817"],[18,80,"21","7","17","FE802171718"],[19,80,"22","9","18","FE802291819"],[208,80,"23","5","6","FE802356208"],[20,81,"25","2","5","FE81252520"],[222,81,"26","2","11","FE8126211222"],[223,81,"27","1","6","FE812716223"],[224,81,"28","2","13","FE8128213224"],[225,81,"29","1","4","FE812914225"],[226,81,"30","1","13","FE8130113226"],[21,81,"31","3","5","FE81313521"],[227,81,"32","1","13","FE8132113227"],[22,81,"33","6","10","FE813361022"],[228,81,"35","1","4","FE813514228"],[229,81,"37","1","9","FE813719229"],[23,81,"38","2","6","FE81382623"],[230,81,"39","7","3","FE813973230"],[231,81,"40A","5","1","FE8140A51231"],[232,81,"40B","6","3","FE8140B63232"],[233,81,"41A","9","8","FE8141A98233"],[24,81,"42","6","5","FE81426524"],[234,81,"44","1","5","FE814415234"],[235,81,"45","1","17","FE8145117235"],[236,81,"46","1","42","FE8146142236"],[237,81,"46","8","18","FE8146818237"],[25,81,"47A","3","11","FE8147A31125"],[26,81,"47B","4","5","FE8147B4526"],[238,81,"48","2","22","FE8148222238"],[239,81,"48","5","52","FE8148552239"],[27,81,"50","6","32","FE815063227"],[240,81,"51","2","18","FE8151218240"],[241,81,"51","8","25","FE8151825241"],[242,81,"52","1","9","FE815219242"],[243,81,"52","8","26","FE8152826243"],[28,81,"53","3","7","FE81533728"],[244,81,"54","2","6","FE815426244"],[245,81,"54","2","26","FE8154226245"],[246,81,"55","3","16","FE8155316246"],[247,81,"55","3","32","FE8155332247"],[29,81,"56","3","16","FE815631629"],[248,81,"57","2","4","FE815724248"],[249,81,"57","2","26","FE8157226249"],[250,81,"58","3","18","FE8158318250"],[30,81,"59","2","8","FE81592830"],[253,82,"60","3","5","FE826035253"],[254,82,"60","3","29","FE8260329254"],[255,82,"60","5","52","FE8260552255"],[31,82,"61","2","27","FE826122731"],[251,82,"61","1","43","FE8261143251"],[252,82,"61","1","57","FE8261157252"],[256,82,"63","2","37","FE8263237256"],[257,82,"64","1","10","FE8264110257"],[258,82,"64","1","27","FE8264127258"],[259,82,"64","1","47","FE8264147259"],[32,82,"65","2","15","FE826521532"],[260,82,"67A","1","11","FE8267A111260"],[261,82,"67B","1","13","FE8267B113261"],[33,82,"68A","2","3","FE8268A2333"],[262,82,"68B","1","2","FE8268B12262"],[34,82,"70","2","6","FE82702634"],[263,82,"70","2","21","FE8270221263"],[264,82,"71","2","12","FE8271212264"],[265,82,"71","2","29","FE8271229265"],[266,82,"73","2","5","FE827325266"],[267,82,"74","3","15","FE8274315267"],[268,82,"75","3","6","FE827536268"],[35,82,"76","4","12","FE827641235"],[210,82,"78","5","25","FE8278525210"],[269,82,"79","2","5","FE827925269"],[270,82,"79","2","46","FE8279246270"],[36,82,"80","3","15","FE828031536"],[271,82,"80","3","37","FE8280337271"],[272,82,"80","3","51","FE8280351272"],[273,82,"81A","2","6","FE8281A26273"],[274,82,"81A","2","28","FE8281A228274"],[275,82,"82A","2","21","FE8282A221275"],[209,82,"82B","2","12","FE8282B212209"],[37,82,"83A","2","8","FE8283A2837"],[276,82,"83A","2","27","FE8283A227276"],[38,90,"260","3","11","FE9026031138"],[39,90,"260","3","28","FE9026032839"],[40,90,"260","8","35","FE9026083540"],[41,90,"260","3","42","FE9026034241"],[42,90,"260","3","2","FE902603242"],[43,90,"260","9","13","FE9026091343"],[44,90,"260","3","19","FE9026031944"],[45,90,"260","7","1","FE902607145"],[46,90,"261","3","1","FE902613146"],[47,90,"261","3","15","FE9026131547"],[48,90,"261","3","26","FE9026132648"],[49,90,"261","4","38","FE9026143849"],[50,90,"261","1","2","FE902611250"],[51,90,"261","3","5","FE902613551"],[52,90,"261","7","29","FE9026172952"],[53,90,"261","8","47","FE9026184753"],[54,90,"261","6","2","FE902616254"],[55,90,"261","7","12","FE9026171255"],[56,90,"261","10","1","FE9026110156"],[57,90,"262","5","4","FE902625457"],[58,90,"262","5","13","FE9026251358"],[59,90,"262","4","23","FE9026242359"],[60,90,"262","4","34","FE9026243460"],[61,90,"263","3","4","FE902633461"],[62,90,"263","3","13","FE9026331362"],[63,90,"263","4","38","FE9026343863"],[64,90,"263","5","1","FE902635164"],[65,90,"263","7","27","FE9026372765"],[66,90,"263","7","47","FE9026374766"],[67,90,"263","10","1","FE9026310167"],[211,90,"265","8","12","FE90265812211"],[212,90,"267","2","8","FE9026728212"],[213,90,"269","7","10","FE90269710213"],[68,90,"271","5","21","FE9027152168"],[69,90,"271","5","32","FE9027153269"],[96,93,"239","4","32","FE9323943296"],[97,93,"239","4","15","FE9323941597"],[98,93,"240","5","8","FE932405898"],[99,93,"240","4","18","FE9324041899"],[100,93,"241","4","11","FE93241411100"],[101,93,"241","4","24","FE93241424101"],[102,93,"242","3","5","FE9324235102"],[103,93,"242","6","24","FE93242624103"],[104,93,"243","3","8","FE9324338104"],[105,93,"243","3","16","FE93243316105"],[106,93,"244","4","18","FE93244418106"],[107,93,"245","3","5","FE9324535107"],[108,93,"245","3","17","FE93245317108"],[109,93,"246","3","6","FE9324636109"],[110,93,"246","3","13","FE93246313110"],[111,93,"246","2","2","FE9324622111"],[112,93,"246","3","15","FE93246315112"],[113,93,"247","3","4","FE9324734113"],[114,93,"247","3","13","FE93247313114"],[115,93,"248","8","10","FE93248810115"],[116,93,"249","8","24","FE93249824116"],[117,93,"250","4","36","FE93250436117"],[118,93,"252","2","17","FE93252217118"],[119,93,"253","3","45","FE93253345119"],[120,93,"254","2","14","FE93254214120"],[121,93,"255","6","24","FE93255624121"],[122,93,"256","16","15","FE932561615122"],[123,93,"256","16","34","FE932561634123"],[124,93,"257","4","37","FE93257437124"],[125,93,"258","25","14","FE932582514125"],[126,93,"259","4","9","FE9325949126"],[127,93,"259","4","45","FE93259445127"],[128,93,"272","4","15","FE93272415128"],[129,93,"273","4","10","FE93273410129"],[130,93,"273","4","24","FE93273424130"],[131,93,"274","3","14","FE93274314131"],[132,93,"274","3","28","FE93274328132"],[133,93,"275","4","32","FE93275432133"],[134,93,"276","5","5","FE9327655134"],[135,93,"276","4","15","FE93276415135"],[136,93,"276","5","34","FE93276534136"],[137,93,"277","5","30","FE93277530137"],[138,94,"204","4","16","FE94204416138"],[139,94,"205","5","29","FE94205529139"],[140,94,"206","3","15","FE94206315140"],[141,94,"207","7","29","FE94207729141"],[142,94,"209","3","5","FE9420935142"],[143,94,"210","3","13","FE94210313143"],[144,94,"211","4","9","FE9421149144"],[145,94,"212","3","12","FE94212312145"],[146,94,"213","3","7","FE9421337146"],[147,94,"214","6","3","FE9421463147"],[148,94,"215","7","18","FE94215718148"],[149,94,"216","3","7","FE9421637149"],[150,94,"217","2","19","FE94217219150"],[151,94,"218","3","17","FE94218317151"],[152,94,"219","2","6","FE9421926152"],[153,94,"220","3","12","FE94220312153"],[154,94,"221","2","5","FE9422125154"],[155,94,"222","4","10","FE94222410155"],[156,94,"223","3","16","FE94223316156"],[157,94,"224","2","10","FE94224210157"],[158,94,"224","2","27","FE94224227158"],[159,94,"225","4","15","FE94225415159"],[160,94,"226","4","16","FE94226416160"],[161,94,"227","3","9","FE9422739161"],[162,94,"228","3","5","FE9422835162"],[163,94,"229","3","8","FE9422938163"],[164,94,"230","3","20","FE94230320164"],[165,94,"231","4","14","FE94231414165"],[166,94,"232","17","10","FE942321710166"],[167,94,"233","3","12","FE94233312167"],[168,94,"234","2","12","FE94234212168"],[169,94,"234","3","11","FE94234311169"],[170,94,"235","4","30","FE94235430170"],[171,94,"236","3","21","FE94236321171"],[172,94,"237","3","11","FE94237311172"],[173,94,"238","7","7","FE9423877173"],[174,94,"238","4","19","FE94238419174"],[70,95,"186","2","3","FE951862370"],[71,95,"186","2","17","FE9518621771"],[72,95,"187","3","13","FE9518731372"],[214,95,"188","7","14","FE95188714214"],[73,95,"190","5","3","FE951905373"],[74,95,"191","3","5","FE951913574"],[75,95,"191","3","14","FE9519131475"],[76,95,"192","2","5","FE951922576"],[77,95,"193","3","5","FE951933577"],[78,95,"193","3","20","FE9519332078"],[79,95,"193","4","29","FE9519342979"],[215,95,"195","7","14","FE95195714215"],[216,95,"197","2","12","FE95197212216"],[80,95,"199","2","1","FE951992180"],[81,95,"199","6","1","FE951996181"],[82,95,"200","2","7","FE952002782"],[83,95,"200","1","1","FE952001183"],[84,95,"200","3","1","FE952003184"],[85,95,"201","6","2","FE952016285"],[86,95,"201","1","2","FE952011286"],[87,95,"201","3","1","FE952013187"],[88,95,"201","8","1","FE952018188"],[89,95,"202","3","15","FE9520231589"],[90,95,"202","5","1","FE952025190"],[91,95,"203","3","1","FE952033191"],[92,95,"203","3","26","FE9520332692"],[93,95,"203","2","5","FE952032593"],[94,95,"203","8","2","FE952038294"],[95,95,"203","9","1","FE952039195"],[175,120,"84","10","30","FE120841030175"],[217,120,"86","6","20","FE12086620217"],[176,120,"87","4","12","FE12087412176"],[177,120,"88","3","21","FE12088321177"],[218,120,"90","5","23","FE12090523218"],[178,120,"91","3","15","FE12091315178"],[219,120,"92","5","10","FE12092510219"],[220,120,"94","5","22","FE12094522220"],[221,120,"96","3","23","FE12096323221"],[179,122,"98A","6","7","FE12298A67179"],[180,122,"98B","","","FE12298B180"],[181,122,"100A","4","9","FE122100A49181"],[182,122,"100B","7","13","FE122100B713182"],[183,122,"102A","9","8","FE122102A98183"],[185,122,"103","3","14","FE122103314185"],[186,122,"104","3","11","FE122104311186"],[184,122,"104b","2","4","FE122104b24184"],[187,122,"105A","3","7","FE122105A37187"],[188,122,"106A","3","8","FE122106A38188"],[189,122,"106B","7","8","FE122106B78189"],[190,122,"107","3","15","FE122107315190"],[191,122,"107","3","27","FE122107327191"],[192,122,"108","6","11","FE122108611192"],[193,122,"108","3","36","FE122108336193"],[194,122,"110","6","13","FE122110613194"],[195,122,"110","6","37","FE122110637195"],[196,123,"279","3","5","FE12327935196"],[197,123,"282","6","6","FE12328266197"],[198,123,"282","6","16","FE123282616198"],[199,123,"284","6","6","FE12328466199"],[200,123,"284","6","22","FE123284622200"],[201,123,"286","4","9","FE12328649201"],[202,123,"286","4","29","FE123286429202"],[203,123,"288","3","6","FE12328836203"],[204,123,"290","13","3","FE123290133204"],[205,123,"290","13","9","FE123290139205"]]};
 (function(){
-  const KEY='picudos_v1', KEYH='picudos_hdr_v1', KEYB='picudos_base_v1';
+  const KEY='picudos_v1', KEYH='picudos_hdr_v1', KEYB='picudos_base_v1', KEYC='picudos_gps_v1';
+  let GPS={};
   const ESTADOS=['Buena','Dañada','Sin feromona','Caída','No encontrada'];
   const $=id=>document.getElementById(id);
   let regs=[], base=BASE_EMBEBIDA, lote=null, cur=null, editId=null, estado='Buena', downloads=null;
@@ -214,7 +250,19 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   $('nombre').innerHTML='<option value="">— Elegir —</option>'+PERSONAL.map(n=>'<option>'+esc(n)+'</option>').join('');
 
   // ---------- almacenamiento ----------
+  function loadGps(){try{const g=JSON.parse(localStorage.getItem(KEYC)||'{}');GPS=(g&&typeof g==='object')?g:{};}catch(e){GPS={};}}
+  function saveGps(){try{localStorage.setItem(KEYC,JSON.stringify(GPS));return true;}catch(e){alert('No se pudo guardar la ubicación: '+e.message);return false;}}
+  const parseLL=s=>{const m=String(s||'').match(/(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)/);if(!m)return null;const a=+m[1],b=+m[2];return(Math.abs(a)<=90&&Math.abs(b)<=180&&(a||b))?[a,b]:null;};
+  function coordsOf(num){const g=GPS[num];if(g)return{lat:g[0],lng:g[1],acc:g[2],fecha:g[3],por:g[4],src:'tel'};const t=BYNUM[num];const ll=t&&parseLL(t[6]);return ll?{lat:ll[0],lng:ll[1],acc:null,fecha:'',por:'',src:'base'}:null;}
+  const llTxt=c=>c.lat.toFixed(6)+', '+c.lng.toFixed(6);
+  const R2D=180/Math.PI,D2R=Math.PI/180;
+  function distM(a,b,c,d){const R=6371000,dl=(c-a)*D2R,dn=(d-b)*D2R,x=Math.sin(dl/2)**2+Math.cos(a*D2R)*Math.cos(c*D2R)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+  function rumbo(a,b,c,d){const y=Math.sin((d-b)*D2R)*Math.cos(c*D2R),x=Math.cos(a*D2R)*Math.sin(c*D2R)-Math.sin(a*D2R)*Math.cos(c*D2R)*Math.cos((d-b)*D2R);return(Math.atan2(y,x)*R2D+360)%360;}
+  const PUNTOS=['norte','noreste','este','sureste','sur','suroeste','oeste','noroeste'];
+  const punto=g=>PUNTOS[Math.round(g/45)%8];
+  const fmtD=m=>m>=1000?(m/1000).toFixed(2)+' km':Math.round(m)+' m';
   function load(){
+    loadGps();
     try{regs=JSON.parse(localStorage.getItem(KEY)||'[]');}catch(e){regs=[];}
     try{const b=JSON.parse(localStorage.getItem(KEYB)||'null');if(b&&Array.isArray(b.t)&&b.t.length&&(b.gen||'')>=(base.gen||''))base=b;}catch(e){}
     try{const h=JSON.parse(localStorage.getItem(KEYH)||'{}');if(PERSONAL.includes(h.nombre))$('nombre').value=h.nombre;if(h.lote)lote=h.lote;}catch(e){}
@@ -243,7 +291,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
       const r=regOf(t[0],f), u=lastOf(t[0],f);
       let pill='<span class="pill">Pendiente</span>';
       if(r)pill='<span class="pill '+(r.estado!=='Buena'?'bad':(r.pic||r.mar)?'hit':'ok')+'">'+r.pic+' pic · '+r.mar+' mar'+(r.estado!=='Buena'?'<br>'+esc(r.estado):'')+'</span>';
-      return '<button type="button" class="trap" data-n="'+t[0]+'"><span class="n">'+t[0]+'</span><span class="g"><span class="t">'+(q?'L'+t[1]+' · ':'')+'Centro '+esc(t[2])+'</span><br><span class="s">H'+esc(t[3]||'–')+' · P'+esc(t[4]||'–')+(u?' · última: '+fmtF(u.fecha)+' ('+u.pic+' pic)':'')+'</span></span>'+pill+'</button>';
+      return '<button type="button" class="trap" data-n="'+t[0]+'"><span class="n">'+t[0]+'</span><span class="g"><span class="t">'+(q?'L'+t[1]+' · ':'')+'Centro '+esc(t[2])+'</span><br><span class="s">H'+esc(t[3]||'–')+' · P'+esc(t[4]||'–')+(coordsOf(t[0])?' · GPS':'')+(u?' · última: '+fmtF(u.fecha)+' ('+u.pic+' pic)':'')+'</span></span>'+pill+'</button>';
     }).join(''):'<div class="hint">Ninguna trampa con ese número.</div>';
     // resumen
     $('sTra').textContent=dia.length;
@@ -262,7 +310,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
     $('lista').innerHTML=vis.length?vis.map(r=>{const t=BYNUM[r.num];
       return '<div class="rec"><div><div class="t">Trampa '+r.num+(t?' · L'+t[1]+' C'+esc(t[2]):'')+'</div><div class="s">'+fmtF(r.fecha)+' · '+esc(r.nombre)+'</div><div class="s">'+r.pic+' picudos · '+r.mar+' mariposas · '+esc(r.estado)+'</div>'+(r.obs?'<div class="s">“'+esc(r.obs)+'”</div>':'')+
       '</div><div class="acts"><button data-ed="'+r.id+'">Editar</button><button class="del" data-del="'+r.id+'">✕</button></div></div>';}).join(''):'<div class="hint">Sin registros.</div>';
-    $('baseInfo').innerHTML='<b>'+T.length+' trampas</b> en '+LOTES.length+' lotes · base del '+fmtF(base.gen)+'<br><span class="hint">Archivo: '+esc(base.src||'')+'</span>';
+    $('baseInfo').innerHTML='<b>'+T.length+' trampas</b> en '+LOTES.length+' lotes · <b>'+T.filter(t=>coordsOf(t[0])).length+' con GPS</b> · base del '+fmtF(String(base.gen).slice(0,10))+'<br><span class="hint">Archivo: '+esc(base.src||'')+'</span>';
   }
 
   // ---------- hoja de captura ----------
@@ -280,11 +328,105 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
     const u=lastOf(num,f);
     $('shPrev').textContent=(r?'Ya revisada el '+fmtF(f)+' por '+r.nombre+'. Está editando. ':'')+(u?'Revisión anterior: '+fmtF(u.fecha)+' · '+u.pic+' picudos · '+u.mar+' mariposas.':'Sin revisiones anteriores en este teléfono.');
     $('pic').value=r?r.pic:0;$('mar').value=r?r.mar:0;$('obs').value=r?r.obs:'';estado=r?r.estado:'Buena';
-    paintEstado();$('msg').className='msg';
+    paintEstado();$('msg').className='msg';renderGpsBox();
     $('btnQuitar').style.display=r?'block':'none';
     $('ov').hidden=false;document.body.style.overflow='hidden';
   }
-  function closeTrap(){$('ov').hidden=true;document.body.style.overflow='';cur=null;editId=null;}
+  function renderGpsBox(){
+    if(!cur)return;const c=coordsOf(cur.num),b=$('gpsBox');
+    if(c){
+      b.innerHTML='<div class="ro"><b>Ubicación:</b> '+llTxt(c)+(c.acc!=null?' · ±'+Math.round(c.acc)+' m':'')+'</div><div class="hint">'+(c.src==='tel'?'Tomada en este teléfono'+(c.fecha?' el '+fmtF(c.fecha):'')+(c.por?' por '+esc(c.por):''):'De la base de trampas')+'</div>'+
+        '<div class="row-btns"><button class="btn btn-p" type="button" id="gpsIr">Ir a la trampa</button><button class="btn btn-s" type="button" id="gpsTomar">Volver a tomar GPS</button></div>';
+    }else{
+      b.innerHTML='<div class="ro">Esta trampa no tiene coordenadas.</div><div class="hint">Párese junto a la trampa y toque el botón. Tarda unos segundos en afinar la señal.</div><button class="btn btn-p" type="button" id="gpsTomar">Tomar GPS aquí</button>';
+    }
+    const ir=$('gpsIr');if(ir)ir.onclick=()=>abrirNav(cur.num);
+    $('gpsTomar').onclick=tomarGps;
+  }
+  let tomando=null;
+  function tomarGps(){
+    if(!navigator.geolocation){alert('Este navegador no tiene GPS.');return;}
+    if(tomando!=null)return;
+    const num=cur.num,b=$('gpsTomar');let mejor=null,fin;
+    b.disabled=true;b.textContent='Buscando señal…';
+    const terminar=()=>{
+      if(tomando==null)return;navigator.geolocation.clearWatch(tomando);tomando=null;clearTimeout(fin);
+      if(!mejor){alert('No se pudo obtener la señal GPS. Revise que la ubicación del teléfono esté activada y que Chrome tenga permiso.');if(cur&&cur.num===num)renderGpsBox();return;}
+      const c=mejor.coords,ant=coordsOf(num);
+      if(ant&&!confirm('La trampa '+num+' ya tiene coordenadas. ¿Reemplazarlas por las nuevas (±'+Math.round(c.accuracy)+' m)?')){if(cur&&cur.num===num)renderGpsBox();return;}
+      GPS[num]=[+c.latitude.toFixed(7),+c.longitude.toFixed(7),Math.round(c.accuracy),hoy(),$('nombre').value||''];
+      saveGps();toast('Ubicación guardada · ±'+Math.round(c.accuracy)+' m');
+      if(cur&&cur.num===num)renderGpsBox();render();
+    };
+    tomando=navigator.geolocation.watchPosition(p=>{
+      if(!mejor||p.coords.accuracy<mejor.coords.accuracy)mejor=p;
+      if(b.isConnected)b.textContent='Afinando señal… ±'+Math.round(mejor.coords.accuracy)+' m (toque para guardar)';
+      b.disabled=false;b.onclick=terminar;
+      if(mejor.coords.accuracy<=5)terminar();
+    },err=>{if(!mejor){navigator.geolocation.clearWatch(tomando);tomando=null;clearTimeout(fin);alert(err.code===1?'Chrome no tiene permiso de ubicación. Actívelo en la configuración del sitio.':'No se pudo obtener la señal GPS ('+err.message+').');if(cur&&cur.num===num)renderGpsBox();}},
+    {enableHighAccuracy:true,maximumAge:0,timeout:30000});
+    fin=setTimeout(terminar,25000);
+  }
+
+  // ---------- navegación hasta la trampa ----------
+  let navNum=null,navWatch=null,navPos=null,rumboBrujula=null,rumboGps=null;
+  function abrirNav(num){
+    const c=coordsOf(num);if(!c)return;
+    navNum=num;navPos=null;rumboGps=null;
+    const t=BYNUM[num];
+    $('navT').textContent='Trampa '+num;$('navS').textContent='Lote '+t[1]+' · Centro '+t[2]+' · H'+(t[3]||'–')+' · P'+(t[4]||'–');
+    $('navDist').textContent='—';$('navDir').textContent='';$('navEst').textContent='Buscando señal GPS…';
+    $('nav').classList.remove('llego');$('nav').hidden=false;
+    if(navigator.geolocation)navWatch=navigator.geolocation.watchPosition(p=>{navPos=p;
+      if(p.coords.heading!=null&&!isNaN(p.coords.heading)&&(p.coords.speed||0)>0.6)rumboGps=p.coords.heading;
+      pintarNav();},err=>{$('navEst').textContent=err.code===1?'Sin permiso de ubicación para Chrome.':'Sin señal GPS. Busque un claro.';},{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+    iniciarBrujula();
+  }
+  function cerrarNav(){if(navWatch!=null)navigator.geolocation.clearWatch(navWatch);navWatch=null;navNum=null;$('nav').hidden=true;}
+  function pintarNav(){
+    if(navNum==null||!navPos)return;
+    const c=coordsOf(navNum),p=navPos.coords;
+    const d=distM(p.latitude,p.longitude,c.lat,c.lng),r=rumbo(p.latitude,p.longitude,c.lat,c.lng);
+    const acc=Math.round(p.accuracy),lleg=d<=Math.max(8,p.accuracy*0.8);
+    $('navDist').textContent=fmtD(d);
+    const head=rumboBrujula!=null?rumboBrujula:rumboGps;
+    $('navArrow').setAttribute('transform','rotate('+((r-(head||0))+360)%360+' 100 100)');
+    $('navRose').setAttribute('transform','rotate('+((360-(head||0))%360)+' 100 100)');
+    $('navDir').textContent=lleg?'¡Llegó! Busque la trampa alrededor.':'Camine hacia el '+punto(r)+' ('+Math.round(r)+'°)';
+    $('nav').classList.toggle('llego',lleg);
+    $('navEst').textContent='Precisión de su GPS: ±'+acc+' m'+(head==null?' · La flecha apunta como un mapa con el norte arriba; camine unos pasos para que se oriente.':(rumboBrujula!=null?' · Brújula activa':' · Orientado por su caminar'))+(c.acc!=null?' · Trampa tomada con ±'+c.acc+' m':'');
+  }
+  let brujulaOn=false;
+  function onOri(e){let h=null;
+    if(e.webkitCompassHeading!=null)h=e.webkitCompassHeading;
+    else if(e.absolute&&e.alpha!=null)h=(360-e.alpha)%360;
+    if(h!=null){const so=(screen.orientation&&screen.orientation.angle)||0;rumboBrujula=(h+so)%360;$('navBrujula').style.display='none';pintarNav();}}
+  function iniciarBrujula(){
+    if(brujulaOn)return;
+    const DOE=window.DeviceOrientationEvent;
+    if(DOE&&typeof DOE.requestPermission==='function')$('navBrujula').style.display='block';
+    if('ondeviceorientationabsolute' in window)window.addEventListener('deviceorientationabsolute',onOri);
+    else window.addEventListener('deviceorientation',onOri);
+    brujulaOn=true;
+  }
+  $('navBrujula').addEventListener('click',()=>{DeviceOrientationEvent.requestPermission().then(s=>{if(s==='granted'){window.addEventListener('deviceorientation',onOri);brujulaOn=true;$('navBrujula').style.display='none';}}).catch(()=>{});});
+  $('navCerrar').addEventListener('click',cerrarNav);
+
+  // ---------- trampas cercanas ----------
+  $('btnCerca').addEventListener('click',()=>{
+    if(!navigator.geolocation){alert('Este navegador no tiene GPS.');return;}
+    const b=$('btnCerca');b.disabled=true;b.textContent='Buscando su ubicación…';
+    navigator.geolocation.getCurrentPosition(p=>{
+      b.disabled=false;b.textContent='Trampas cercanas (GPS)';
+      const la=p.coords.latitude,lo=p.coords.longitude;
+      const l=T.map(t=>{const c=coordsOf(t[0]);return c?{t,d:distM(la,lo,c.lat,c.lng),r:rumbo(la,lo,c.lat,c.lng)}:null;}).filter(Boolean).sort((a,b)=>a.d-b.d).slice(0,8);
+      $('cerca').innerHTML=l.length?'<div class="hint">Su posición ±'+Math.round(p.coords.accuracy)+' m. Toque una trampa para abrirla.</div>'+l.map(x=>'<button type="button" class="trap" data-n="'+x.t[0]+'"><span class="n">'+x.t[0]+'</span><span class="g"><span class="t">L'+x.t[1]+' · Centro '+esc(x.t[2])+'</span><br><span class="s">'+fmtD(x.d)+' al '+punto(x.r)+'</span></span></button>').join('')
+        :'<div class="hint">Ninguna trampa tiene coordenadas todavía.</div>';
+    },err=>{b.disabled=false;b.textContent='Trampas cercanas (GPS)';alert(err.code===1?'Chrome no tiene permiso de ubicación.':'No se pudo obtener la señal GPS.');},{enableHighAccuracy:true,maximumAge:15000,timeout:30000});
+  });
+  $('cerca').addEventListener('click',e=>{const b=e.target.closest('[data-n]');if(b)openTrap(Number(b.dataset.n));});
+
+  function closeTrap(){if(tomando!=null){navigator.geolocation.clearWatch(tomando);tomando=null;}$('ov').hidden=true;document.body.style.overflow='';cur=null;editId=null;}
   function guardar(){
     if(!cur)return false;
     const f=cur.fecha,nom=$('nombre').value;
@@ -350,14 +492,24 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   function serial(iso){const[a,m,d]=iso.split('-').map(Number);return(Date.UTC(a,m-1,d)-Date.UTC(1899,11,30))/86400000;}
   const cell=v=>{if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(v);return isNaN(n)?{t:String(v)}:{n};};
   function buildXlsx(rows){
-    const H=['Fecha','Distrito','Responsable','Finca','Codigo de la trampa','Lote','Centro','Hilera','Palma','# trampa','Cordenadas','Ubicación','Hembras','Machos','Total Pic','Estado de la trampa','Mariposas de Opsiphanes','Observaciones','Registrado'];
+    const Hh=['Fecha','Distrito','Responsable','Finca','Codigo de la trampa','Lote','Centro','Hilera','Palma','# trampa','Cordenadas','Ubicación','Hembras','Machos','Total Pic','Estado de la trampa','Mariposas de Opsiphanes','Observaciones','Registrado'];
     const reg=c=>{const d=new Date(c);if(isNaN(d))return'';const p=n=>String(n).padStart(2,'0');return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes());};
     const NA={t:'n/a'};
-    const data=rows.map(r=>{const t=BYNUM[r.num]||[r.num,'','','','',''];return[
-      {d:r.fecha},{t:'ASD'},{t:r.nombre},{t:'FE'},{t:t[5]},cell(t[1]),cell(t[2]),cell(t[3]),cell(t[4]),{n:r.num},NA,NA,NA,NA,
+    const data=rows.map(r=>{const t=BYNUM[r.num]||[r.num,'','','','',''],c=coordsOf(r.num);return[
+      {d:r.fecha},{t:'ASD'},{t:r.nombre},{t:'FE'},{t:t[5]},cell(t[1]),cell(t[2]),cell(t[3]),cell(t[4]),{n:r.num},c?{t:llTxt(c)}:NA,NA,NA,NA,
       {n:r.pic},{t:r.estado},{n:r.mar},r.obs?{t:r.obs}:null,{t:reg(r.creado)}];});
+    return xlsxDe(Hh,data,[11,8,20,6,22,6,8,7,7,9,24,10,9,9,9,16,12,28,16],'Captura picudos');
+  }
+  function buildBaseGps(){
+    const H=['Fecha','Distrito','Responsable','Finca','Codigo de la trampa','Lote','Centro','Hilera','Palma','# trampa','Cordenadas','Ubicación','Hembras','Machos','Total Pic','Estado de la trampa','Mariposas de Opsiphanes','Precisión GPS (m)','GPS tomado','GPS tomado por'];
+    const NA={t:'n/a'};
+    const data=T.map(t=>{const c=coordsOf(t[0]);return[null,{t:'ASD'},null,{t:'FE'},{t:t[5]},cell(t[1]),cell(t[2]),cell(t[3]),cell(t[4]),{n:t[0]},c?{t:llTxt(c)}:NA,NA,NA,NA,null,null,null,
+      c&&c.acc!=null?{n:c.acc}:null,c&&c.fecha?{d:c.fecha}:null,c&&c.por?{t:c.por}:null];});
+    return xlsxDe(H,data,[11,8,14,6,22,6,8,7,7,9,24,10,9,9,9,14,12,12,12,22],'BASE');
+  }
+  function xlsxDe(H,data,W,hoja){
     let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>';
-    [11,8,20,6,22,6,8,7,7,9,11,10,9,9,9,16,12,28,16].forEach((w,i)=>x+='<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>');
+    W.forEach((w,i)=>x+='<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>');
     x+='</cols><sheetData><row r="1">'+H.map((h,i)=>'<c r="'+colL(i)+'1" t="inlineStr" s="2"><is><t>'+xe(h)+'</t></is></c>').join('')+'</row>';
     data.forEach((row,ri)=>{const rn=ri+2;x+='<row r="'+rn+'">';
       row.forEach((c,ci)=>{if(!c)return;const ref=colL(ci)+rn;
@@ -369,7 +521,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
     return zip([
       {name:'[Content_Types].xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'},
       {name:'_rels/.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
-      {name:'xl/workbook.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Captura picudos" sheetId="1" r:id="rId1"/></sheets></workbook>'},
+      {name:'xl/workbook.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+xe(hoja)+'" sheetId="1" r:id="rId1"/></sheets></workbook>'},
       {name:'xl/_rels/workbook.xml.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'},
       {name:'xl/styles.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF5A3A14"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'},
       {name:'xl/worksheets/sheet1.xml',data:x}]);
@@ -383,10 +535,12 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   $('btnExcel').addEventListener('click',()=>{if(!regs.length){alert('No hay registros.');return;}descargar(buildXlsx(ordenar(regs)),'Picudos_captura_'+hoy()+'.xlsx');});
   $('btnExcelFecha').addEventListener('click',()=>{const f=$('filtroFecha').value,rs=f==='*'?regs:regs.filter(r=>r.fecha===f);
     if(!rs.length){alert('No hay registros para esa fecha.');return;}descargar(buildXlsx(ordenar(rs)),'Picudos_'+(f==='*'?'todas':f)+'.xlsx');});
-  $('btnRespaldo').addEventListener('click',()=>descargar(new Blob([JSON.stringify(regs)],{type:'application/json'}),'Picudos_respaldo_'+hoy()+'.json'));
+  $('btnBaseGps').addEventListener('click',()=>descargar(buildBaseGps(),'BASE_TRAMPAS_GPS_'+hoy()+'.xlsx'));
+  $('btnRespaldo').addEventListener('click',()=>descargar(new Blob([JSON.stringify({regs,gps:GPS})],{type:'application/json'}),'Picudos_respaldo_'+hoy()+'.json'));
   $('btnCargar').addEventListener('click',()=>$('fileRespaldo').click());
   $('fileRespaldo').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;
-    f.text().then(t=>{const arr=JSON.parse(t);if(!Array.isArray(arr))throw new Error('formato inválido');
+    f.text().then(t=>{const j=JSON.parse(t),arr=Array.isArray(j)?j:j&&j.regs;if(!Array.isArray(arr))throw new Error('formato inválido');
+      let ng=0;if(j&&j.gps&&typeof j.gps==='object')Object.keys(j.gps).forEach(k=>{if(!GPS[k]&&Array.isArray(j.gps[k])){GPS[k]=j.gps[k];ng++;}});if(ng)saveGps();
       const ids=new Set(regs.map(r=>r.id));let n=0;arr.forEach(r=>{if(r&&r.id&&!ids.has(r.id)&&!regOf(r.num,r.fecha)){regs.push(r);n++;}});
       save();render();alert('Se agregaron '+n+' registros del respaldo.');}).catch(err=>alert('No se pudo leer el respaldo: '+err.message));
     e.target.value='';});
@@ -430,11 +584,11 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
       const a=[];for(const c of r.getElementsByTagName('c'))a[colIdx(c.getAttribute('r'))]=(val(c)||'').toString().trim();
       if(!H){const low=Array.from(a,x=>(x||'').toLowerCase());
         if(low.includes('# trampa')&&low.includes('lote')){const f=n=>low.indexOf(n);
-          H={cod:low.findIndex(x=>x.startsWith('codigo')),lote:f('lote'),cen:f('centro'),hil:f('hilera'),pal:f('palma'),num:f('# trampa')};}
+          H={gps:low.findIndex(x=>x.startsWith('cordenada')||x.startsWith('coordenada')),cod:low.findIndex(x=>x.startsWith('codigo')),lote:f('lote'),cen:f('centro'),hil:f('hilera'),pal:f('palma'),num:f('# trampa')};}
         continue;}
       const num=parseInt(a[H.num],10);if(isNaN(num)||seen.has(num))continue;seen.add(num);
       const s=i=>i>=0&&a[i]!=null?a[i]:'';
-      out.push([num,Number(s(H.lote))||s(H.lote),s(H.cen),s(H.hil),s(H.pal),s(H.cod)||('FE-'+s(H.lote)+'-'+s(H.cen)+'-'+s(H.hil)+'-'+s(H.pal)+'-'+num)]);
+      out.push([num,Number(s(H.lote))||s(H.lote),s(H.cen),s(H.hil),s(H.pal),s(H.cod)||('FE-'+s(H.lote)+'-'+s(H.cen)+'-'+s(H.hil)+'-'+s(H.pal)+'-'+num),(()=>{const ll=parseLL(s(H.gps));return ll?ll[0]+', '+ll[1]:'';})()]);
     }
     if(!H)throw new Error('no se encontró la fila de encabezados (Lote, # trampa)');
     if(!out.length)throw new Error('la hoja no tiene trampas');
@@ -458,7 +612,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   $('fecha').value=hoy();
   render();
   if(window.claude&&typeof window.claude.use==='function'){window.claude.use('downloads').then(x=>{downloads=x||null;},()=>{downloads=null;});}
-  window.__app={get regs(){return regs;},buildXlsx,leerBase};
+  window.__app={get regs(){return regs;},buildXlsx,leerBase,buildBaseGps};
 })();
 </script>
 <script>
