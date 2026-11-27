@@ -154,10 +154,10 @@
     <div class="gps" id="gpsBox"></div>
 
     <label for="pic">Total de picudos</label>
-    <div class="cnt"><button type="button" data-step="pic" data-d="-1">−</button><input id="pic" inputmode="numeric" value="0"><button type="button" data-step="pic" data-d="1">+</button></div>
+    <div class="cnt"><button type="button" data-step="pic" data-d="-1">−</button><input id="pic" inputmode="numeric" placeholder="—"><button type="button" data-step="pic" data-d="1">+</button></div>
 
     <label for="mar">Mariposas de Opsiphanes</label>
-    <div class="cnt"><button type="button" data-step="mar" data-d="-1">−</button><input id="mar" inputmode="numeric" value="0"><button type="button" data-step="mar" data-d="1">+</button></div>
+    <div class="cnt"><button type="button" data-step="mar" data-d="-1">−</button><input id="mar" inputmode="numeric" placeholder="—"><button type="button" data-step="mar" data-d="1">+</button></div>
 
     <label>Estado de la trampa</label>
     <div class="seg" id="segEstado"></div>
@@ -176,7 +176,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 3</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 4</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -327,7 +327,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
     $('shD').textContent='Lote '+t[1]+' · Centro '+t[2]+' · H'+(t[3]||'–')+' · P'+(t[4]||'–')+' · '+t[5];
     const u=lastOf(num,f);
     $('shPrev').textContent=(r?'Ya revisada el '+fmtF(f)+' por '+r.nombre+'. Está editando. ':'')+(u?'Revisión anterior: '+fmtF(u.fecha)+' · '+u.pic+' picudos · '+u.mar+' mariposas.':'Sin revisiones anteriores en este teléfono.');
-    $('pic').value=r?r.pic:0;$('mar').value=r?r.mar:0;$('obs').value=r?r.obs:'';estado=r?r.estado:'Buena';
+    $('pic').value=r?r.pic:'';$('mar').value=r?r.mar:'';$('obs').value=r?r.obs:'';estado=r?r.estado:'Buena';
     paintEstado();$('msg').className='msg';renderGpsBox();
     $('btnQuitar').style.display=r?'block':'none';
     $('ov').hidden=false;document.body.style.overflow='hidden';
@@ -429,6 +429,8 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   function closeTrap(){if(tomando!=null){navigator.geolocation.clearWatch(tomando);tomando=null;}$('ov').hidden=true;document.body.style.overflow='';cur=null;editId=null;}
   function guardar(){
     if(!cur)return false;
+    const falta=[['pic','picudos'],['mar','mariposas']].filter(([id])=>!/^\d+$/.test($(id).value.trim())).map(x=>x[1]);
+    if(falta.length){showMsg('Digite la cantidad de '+falta.join(' y ')+' (0 si no hay).',true);$(falta[0]==='picudos'?'pic':'mar').focus();return false;}
     const f=cur.fecha,nom=$('nombre').value;
     const rec={id:editId||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),fecha:f,nombre:nom,num:cur.num,
       pic:int($('pic').value),mar:int($('mar').value),estado,obs:$('obs').value.trim(),creado:new Date().toISOString()};
@@ -450,7 +452,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
     regs=regs.filter(r=>r.id!==editId);save();closeTrap();render();});
   $('shX').addEventListener('click',closeTrap);
   $('ov').addEventListener('click',e=>{if(e.target===$('ov'))closeTrap();});
-  document.querySelectorAll('[data-step]').forEach(b=>b.addEventListener('click',()=>{const i=$(b.dataset.step);i.value=Math.max(0,int(i.value)+Number(b.dataset.d));}));
+  document.querySelectorAll('[data-step]').forEach(b=>b.addEventListener('click',()=>{const i=$(b.dataset.step);const v=i.value.trim();i.value=v===''?(Number(b.dataset.d)>0?1:0):Math.max(0,int(v)+Number(b.dataset.d));}));
   ['pic','mar'].forEach(k=>$(k).addEventListener('focus',e=>e.target.select()));
   $('segEstado').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;estado=b.dataset.e;paintEstado();});
 
