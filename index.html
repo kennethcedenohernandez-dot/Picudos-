@@ -88,6 +88,17 @@
   .nav .btn{max-width:420px}
   .nav.llego{background:#16431f}
   .cerca{margin-top:8px}
+  .mapa{position:fixed;inset:0;z-index:33;background:#1d140a;display:flex;flex-direction:column}
+  .mapa[hidden]{display:none}
+  .mapa-top{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--cafe);color:#fff}
+  .mapa-top select{flex:1;font-size:16px;padding:8px}
+  .mapa-top button{padding:8px 12px;font-size:15px;border-radius:8px;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;cursor:pointer;white-space:nowrap}
+  #mapaBox{flex:1;position:relative;background:#e9e4da}
+  #mapaBox svg{position:absolute;inset:0;width:100%;height:100%}
+  .mapa-ley{display:flex;flex-wrap:wrap;gap:12px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:#fff;font-size:13px;color:var(--gris);align-items:center}
+  .mapa-ley i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:4px;border:2px solid #fff;box-shadow:0 0 0 1px #0004}
+  .lbl-tr{background:transparent;border:0;box-shadow:none;color:#fff;font-weight:800;font-size:12px;text-shadow:0 0 3px #000,0 0 3px #000;padding:0}
+  .lbl-tr:before{display:none}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:40;background:#22190f;color:#fff;padding:10px 16px;border-radius:10px;font-size:15px;font-weight:600;max-width:calc(100% - 32px);text-align:center}
   .toast[hidden]{display:none}
 </style>
@@ -117,7 +128,7 @@
     <div class="seg" id="segLote"></div>
     <label for="buscar">Buscar # de trampa</label>
     <input id="buscar" inputmode="numeric" placeholder="Ej. 231" autocomplete="off">
-    <button class="btn btn-s" id="btnCerca" type="button">Trampas cercanas (GPS)</button>
+    <div class="row-btns"><button class="btn btn-s" id="btnCerca" type="button">Trampas cercanas (GPS)</button><button class="btn btn-s" id="btnMapa" type="button">Ver mapa de trampas</button></div>
     <div id="cerca" class="cerca"></div>
   </section>
 
@@ -176,7 +187,7 @@
 
 <div id="admin" class="admin" hidden>
  <div class="admin-in">
-  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 4</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
+  <div class="admin-top"><b>Opciones <small style="font-weight:400;color:var(--gris)">· versión 5</small></b><button id="btnCerrar" type="button" class="x">✕ Cerrar</button></div>
   <section class="card">
     <h2>Exportar</h2>
     <button class="btn btn-p" id="btnExcel" type="button">Descargar Excel (todos los registros)</button>
@@ -194,12 +205,18 @@
     <h2>Base de trampas</h2>
     <div class="ro" id="baseInfo"></div>
     <button class="btn btn-p" id="btnBaseGps" type="button">Descargar base con coordenadas (.xlsx)</button>
+    <button class="btn btn-s" id="btnKml" type="button">Descargar mapa para Google Earth / Maps (.kml)</button>
     <div class="hint">Sale con las columnas de la hoja BASE y la columna Cordenadas llena. Junte los archivos de todos los teléfonos y mándelos para meter las coordenadas en la app de todos.</div>
     <button class="btn btn-s" id="btnBase" type="button">Cargar base de trampas actualizada</button>
     <input type="file" id="fileBase" accept=".xlsx" style="display:none">
     <div class="hint">Lee la hoja "BASE" (columnas Codigo de la trampa, Lote, Centro, Hilera, Palma, # trampa). Úsela cuando agregue o mueva trampas.</div>
   </section>
  </div>
+</div>
+<div id="mapa" class="mapa" hidden>
+  <div class="mapa-top"><select id="mapaLote"></select><button type="button" id="mapaYo">Mi ubicación</button><button type="button" id="mapaCerrar">✕</button></div>
+  <div id="mapaBox"></div>
+  <div class="mapa-ley"><span><i style="background:#2e9e4f"></i>Revisada hoy</span><span><i style="background:#f0b429"></i>Pendiente</span><span><i style="background:#d64545"></i>Mal estado</span><span><i style="background:#2f7de1"></i>Usted</span><span id="mapaInfo"></span></div>
 </div>
 <div id="nav" class="nav" hidden>
   <div><div class="nt" id="navT"></div><div class="ns" id="navS"></div></div>
@@ -412,6 +429,97 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   $('navBrujula').addEventListener('click',()=>{DeviceOrientationEvent.requestPermission().then(s=>{if(s==='granted'){window.addEventListener('deviceorientation',onOri);brujulaOn=true;$('navBrujula').style.display='none';}}).catch(()=>{});});
   $('navCerrar').addEventListener('click',cerrarNav);
 
+  // ---------- mapa de trampas ----------
+  let LF=null,lmap=null,lcapa=null,lyo=null,miPos=null,mapaWatch=null;
+  function cargarLeaflet(){
+    if(window.L)return Promise.resolve(window.L);
+    if(navigator.onLine===false)return Promise.reject(new Error('sin internet'));
+    return new Promise((ok,no)=>{
+      const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);
+      const s=document.createElement('script');s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      const tm=setTimeout(()=>no(new Error('tiempo')),8000);
+      s.onload=()=>{clearTimeout(tm);window.L?ok(window.L):no(new Error('sin leaflet'));};s.onerror=()=>{clearTimeout(tm);no(new Error('sin internet'));};
+      document.head.appendChild(s);
+    });
+  }
+  function puntosMapa(){
+    const sl=$('mapaLote').value,f=$('fecha').value;
+    return T.filter(t=>sl==='*'||String(t[1])===sl).map(t=>{const c=coordsOf(t[0]);if(!c)return null;const r=regOf(t[0],f);
+      return{t,c,col:r?(r.estado!=='Buena'?'#d64545':'#2e9e4f'):'#f0b429',r};}).filter(Boolean);
+  }
+  function popTxt(x){const t=x.t;return '<b>Trampa '+t[0]+'</b><br>Lote '+t[1]+' · Centro '+esc(t[2])+' · H'+esc(t[3]||'–')+' · P'+esc(t[4]||'–')+'<br>'+(x.r?'Hoy: '+x.r.pic+' picudos · '+x.r.mar+' mariposas · '+esc(x.r.estado):'Pendiente hoy')+'<br><button type="button" data-mn="'+t[0]+'" style="margin-top:6px;padding:8px 10px;border-radius:8px;border:0;background:#5a3a14;color:#fff;font-weight:700">Abrir trampa</button> <button type="button" data-mi="'+t[0]+'" style="margin-top:6px;padding:8px 10px;border-radius:8px;border:1px solid #5a3a14;background:#fff;color:#5a3a14;font-weight:700">Ir</button>';}
+  function abrirMapa(){
+    const lotes=[...new Set(T.filter(t=>coordsOf(t[0])).map(t=>t[1]))].sort((a,b)=>a-b);
+    const n=T.filter(t=>coordsOf(t[0])).length;
+    if(!n){alert('Todavía ninguna trampa tiene coordenadas. Tome el GPS en cada trampa para verlas en el mapa.');return;}
+    $('mapaLote').innerHTML='<option value="*">Todos los lotes ('+n+' con GPS)</option>'+lotes.map(l=>'<option value="'+l+'"'+(l===lote?' selected':'')+'>Lote '+l+' ('+T.filter(t=>t[1]===l&&coordsOf(t[0])).length+' con GPS)</option>').join('');
+    if(!lotes.includes(lote))$('mapaLote').value='*';
+    $('mapa').hidden=false;document.body.style.overflow='hidden';
+    if(navigator.geolocation&&mapaWatch==null)mapaWatch=navigator.geolocation.watchPosition(p=>{miPos=p.coords;pintarYo();},()=>{},{enableHighAccuracy:true,maximumAge:10000,timeout:30000});
+    $('mapaInfo').textContent='Cargando mapa…';
+    cargarLeaflet().then(L=>{LF=L;pintarMapa(true);},()=>{LF=null;pintarMapa(true);});
+  }
+  function cerrarMapa(){$('mapa').hidden=true;document.body.style.overflow='';if(mapaWatch!=null){navigator.geolocation.clearWatch(mapaWatch);mapaWatch=null;}}
+  function pintarMapa(encuadrar){
+    const pts=puntosMapa(),box=$('mapaBox');
+    if(LF){
+      if(!lmap){box.innerHTML='';lmap=LF.map(box,{zoomControl:true,attributionControl:true});
+        LF.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Imágenes © Esri'}).addTo(lmap);
+        lmap.on('zoomend',()=>pintarMapa(false));}
+      setTimeout(()=>lmap.invalidateSize(),50);
+      if(lcapa)lcapa.remove();lcapa=LF.layerGroup().addTo(lmap);
+      const etiquetas=lmap.getZoom()>=17||pts.length<=40;
+      pts.forEach(x=>{const m=LF.circleMarker([x.c.lat,x.c.lng],{radius:8,color:'#fff',weight:2,fillColor:x.col,fillOpacity:1}).bindPopup(popTxt(x)).addTo(lcapa);
+        if(etiquetas)m.bindTooltip(String(x.t[0]),{permanent:true,direction:'right',offset:[8,0],className:'lbl-tr'});});
+      if(encuadrar&&pts.length)lmap.fitBounds(LF.latLngBounds(pts.map(x=>[x.c.lat,x.c.lng])).pad(0.15),{maxZoom:18});
+      $('mapaInfo').textContent=pts.length+' trampas en el mapa';
+      pintarYo();
+    }else{
+      // plano sin internet
+      const W=box.clientWidth,H=box.clientHeight;
+      const all=pts.map(x=>[x.c.lat,x.c.lng]);if(miPos)all.push([miPos.latitude,miPos.longitude]);
+      if(!all.length){box.innerHTML='';return;}
+      let la0=Math.min(...all.map(a=>a[0])),la1=Math.max(...all.map(a=>a[0])),lo0=Math.min(...all.map(a=>a[1])),lo1=Math.max(...all.map(a=>a[1]));
+      const k=Math.cos(((la0+la1)/2)*D2R),mx=Math.max((lo1-lo0)*k,1e-5),my=Math.max(la1-la0,1e-5);
+      const pad=48,s=Math.min((W-2*pad)/mx,(H-2*pad)/my),ox=(W-mx*s)/2,oy=(H-my*s)/2;
+      const X=lo=>ox+(lo-lo0)*k*s,Y=la=>H-oy-(la-la0)*s;
+      const m50=50/111320*s;
+      let g='<svg viewBox="0 0 '+W+' '+H+'"><text x="12" y="22" font-size="13" fill="#6b5f52">Sin internet: plano sin fondo, norte arriba</text>'+
+        '<line x1="12" y1="'+(H-14)+'" x2="'+(12+m50)+'" y2="'+(H-14)+'" stroke="#22190f" stroke-width="3"/><text x="'+(16+m50)+'" y="'+(H-10)+'" font-size="12" fill="#22190f">50 m</text>';
+      pts.forEach(x=>{const px=X(x.c.lng),py=Y(x.c.lat);g+='<g data-mn="'+x.t[0]+'"><circle cx="'+px+'" cy="'+py+'" r="9" fill="'+x.col+'" stroke="#fff" stroke-width="2"/><text x="'+(px+11)+'" y="'+(py+4)+'" font-size="12" font-weight="700" fill="#22190f">'+x.t[0]+'</text></g>';});
+      if(miPos)g+='<circle cx="'+X(miPos.longitude)+'" cy="'+Y(miPos.latitude)+'" r="8" fill="#2f7de1" stroke="#fff" stroke-width="3"/>';
+      box.innerHTML=g+'</svg>';
+      $('mapaInfo').textContent=pts.length+' trampas · toque un punto para abrirla';
+    }
+  }
+  function pintarYo(){
+    if(!miPos||$('mapa').hidden)return;
+    if(LF&&lmap){const ll=[miPos.latitude,miPos.longitude];
+      if(!lyo)lyo=LF.circleMarker(ll,{radius:8,color:'#fff',weight:3,fillColor:'#2f7de1',fillOpacity:1}).addTo(lmap);else lyo.setLatLng(ll);}
+    else if(!LF)pintarMapa(false);
+  }
+  $('btnMapa').addEventListener('click',abrirMapa);
+  $('mapaCerrar').addEventListener('click',cerrarMapa);
+  $('mapaLote').addEventListener('change',()=>pintarMapa(true));
+  $('mapaYo').addEventListener('click',()=>{if(!miPos){toast('Buscando su ubicación…');return;}if(LF&&lmap)lmap.setView([miPos.latitude,miPos.longitude],Math.max(lmap.getZoom(),18));else pintarMapa(false);});
+  $('mapaBox').addEventListener('click',e=>{
+    const a=e.target.closest('[data-mn]'),b=e.target.closest('[data-mi]');
+    if(a){const n=Number(a.dataset.mn);cerrarMapa();openTrap(n);}
+    else if(b){const n=Number(b.dataset.mi);cerrarMapa();abrirNav(n);}
+  });
+  window.addEventListener('resize',()=>{if(!$('mapa').hidden&&!LF)pintarMapa(false);});
+  function buildKml(){
+    const xe2=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const por={};T.forEach(t=>{const c=coordsOf(t[0]);if(c)(por[t[1]]=por[t[1]]||[]).push([t,c]);});
+    let k='<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Trampas de picudo</name>'+
+      '<Style id="t"><IconStyle><color>ff29b4f0</color><scale>0.9</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>';
+    Object.keys(por).sort((a,b)=>a-b).forEach(l=>{k+='<Folder><name>Lote '+xe2(l)+'</name>';
+      por[l].forEach(([t,c])=>{k+='<Placemark><name>'+t[0]+'</name><styleUrl>#t</styleUrl><description>'+xe2('Trampa '+t[0]+' · Lote '+t[1]+' · Centro '+t[2]+' · H'+(t[3]||'–')+' · P'+(t[4]||'–')+' · '+t[5]+(c.acc!=null?' · ±'+c.acc+' m':''))+'</description><Point><coordinates>'+c.lng+','+c.lat+',0</coordinates></Point></Placemark>';});
+      k+='</Folder>';});
+    return new Blob([k+'</Document></kml>'],{type:'application/vnd.google-earth.kml+xml'});
+  }
+  $('btnKml').addEventListener('click',()=>{if(!T.some(t=>coordsOf(t[0]))){alert('Ninguna trampa tiene coordenadas todavía.');return;}descargar(buildKml(),'Trampas_picudo_'+hoy()+'.kml');});
+
   // ---------- trampas cercanas ----------
   $('btnCerca').addEventListener('click',()=>{
     if(!navigator.geolocation){alert('Este navegador no tiene GPS.');return;}
@@ -614,7 +722,7 @@ const BASE_EMBEBIDA={"gen":"2026-11-24b","src":"BASE_TRAMPAS_PICUDO.xlsx (correg
   $('fecha').value=hoy();
   render();
   if(window.claude&&typeof window.claude.use==='function'){window.claude.use('downloads').then(x=>{downloads=x||null;},()=>{downloads=null;});}
-  window.__app={get regs(){return regs;},buildXlsx,leerBase,buildBaseGps};
+  window.__app={get regs(){return regs;},buildXlsx,leerBase,buildBaseGps,buildKml,GPS:()=>GPS,saveGps};
 })();
 </script>
 <script>
